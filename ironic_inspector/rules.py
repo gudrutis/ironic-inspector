@@ -102,17 +102,19 @@ def actions_schema():
 class IntrospectionRule(object):
     """High-level class representing an introspection rule."""
 
-    def __init__(self, uuid, conditions, actions, description):
+    def __init__(self, uuid, conditions, actions, description, scope):
         """Create rule object from database data."""
         self._uuid = uuid
         self._conditions = conditions
         self._actions = actions
         self._description = description
+        self._scope = scope
 
     def as_dict(self, short=False):
         result = {
             'uuid': self._uuid,
             'description': self._description,
+            'scope': self._scope
         }
 
         if not short:
@@ -337,9 +339,9 @@ def _validate_actions(actions_json):
         actions.append((action_json['action'], params))
     return actions
 
-
+# TODO update call
 def create(conditions_json, actions_json, uuid=None,
-           description=None):
+           description=None, scope=None):
     """Create a new rule in database.
 
     :param conditions_json: list of dicts with the following keys:
@@ -351,6 +353,8 @@ def create(conditions_json, actions_json, uuid=None,
                          Other keys are stored as is.
     :param uuid: rule UUID, will be generated if empty
     :param description: human-readable rule description
+    :param scope: if scope on node and rule matches, rule applies;
+                  if its empty, rule applies to all nodes.
     :returns: new IntrospectionRule object
     :raises: utils.Error on failure
     """
@@ -386,12 +390,14 @@ def create(conditions_json, actions_json, uuid=None,
         raise utils.Error(_('Rule with UUID %s already exists') % uuid,
                           code=409)
 
-    LOG.info('Created rule %(uuid)s with description "%(descr)s"',
-             {'uuid': uuid, 'descr': description})
+    LOG.info('Created rule %(uuid)s with description "%(descr)s" '
+             'and scope "%scope"',
+             {'uuid': uuid, 'descr': description, 'scope': scope})
     return IntrospectionRule(uuid=uuid,
                              conditions=rule.conditions,
                              actions=rule.actions,
-                             description=description)
+                             description=IntrospectionRule,
+                             scope=scope)
 
 
 def get(uuid):
@@ -403,7 +409,8 @@ def get(uuid):
 
     return IntrospectionRule(uuid=rule.uuid, actions=rule.actions,
                              conditions=rule.conditions,
-                             description=rule.description)
+                             description=rule.description,
+                             scope=rule.scope)
 
 
 def get_all():
@@ -411,7 +418,8 @@ def get_all():
     query = db.model_query(db.Rule).order_by(db.Rule.created_at)
     return [IntrospectionRule(uuid=rule.uuid, actions=rule.actions,
                               conditions=rule.conditions,
-                              description=rule.description)
+                              description=rule.description,
+                              scope=rule.scope)
             for rule in query]
 
 
@@ -453,6 +461,11 @@ def apply(node_info, data):
 
     to_apply = []
     for rule in rules:
+        # if rule.scope and rule.scope != node.properties['inspection_scope']:
+        #     # if rule.scope is set but does not match the node inspection scope
+        #     # then ignore
+        #     continue
+
         if rule.check_conditions(node_info, data):
             to_apply.append(rule)
 
