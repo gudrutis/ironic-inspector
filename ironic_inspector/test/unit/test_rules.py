@@ -56,7 +56,8 @@ class TestCreateRule(BaseTest):
         self.assertTrue(rule_json.pop('uuid'))
         self.assertEqual({'description': None,
                           'conditions': [],
-                          'actions': self.actions_json},
+                          'actions': self.actions_json,
+                          'scope': None},
                          rule_json)
 
     def test_create_action_none_value(self):
@@ -68,7 +69,8 @@ class TestCreateRule(BaseTest):
         self.assertTrue(rule_json.pop('uuid'))
         self.assertEqual({'description': None,
                           'conditions': [],
-                          'actions': self.actions_json},
+                          'actions': self.actions_json,
+                          'scope': None},
                          rule_json)
 
     def test_duplicate_uuid(self):
@@ -94,7 +96,8 @@ class TestCreateRule(BaseTest):
         self.assertEqual({'description': None,
                           'conditions': [BaseTest.condition_defaults(cond)
                                          for cond in self.conditions_json],
-                          'actions': self.actions_json},
+                          'actions': self.actions_json,
+                          'scope': None},
                          rule_json)
 
     def test_invalid_condition(self):
@@ -170,7 +173,8 @@ class TestGetRule(BaseTest):
         self.assertEqual({'description': None,
                           'conditions': [BaseTest.condition_defaults(cond)
                                          for cond in self.conditions_json],
-                          'actions': self.actions_json},
+                          'actions': self.actions_json,
+                          'scope': None},
                          rule_json)
 
     def test_not_found(self):

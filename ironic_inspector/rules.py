@@ -369,8 +369,8 @@ def create(conditions_json, actions_json, uuid=None,
 
     try:
         with db.ensure_transaction() as session:
-            rule = db.Rule(uuid=uuid, description=description,
-                           disabled=False, created_at=timeutils.utcnow())
+            rule = db.Rule(uuid=uuid, description=description, disabled=False,
+                           created_at=timeutils.utcnow(), scope=scope)
 
             for field, op, multiple, invert, params in conditions:
                 rule.conditions.append(db.RuleCondition(op=op,
@@ -391,13 +391,13 @@ def create(conditions_json, actions_json, uuid=None,
                           code=409)
 
     LOG.info('Created rule %(uuid)s with description "%(descr)s" '
-             'and scope "%scope"',
+             'and scope "%(scope)s"',
              {'uuid': uuid, 'descr': description, 'scope': scope})
     return IntrospectionRule(uuid=uuid,
                              conditions=rule.conditions,
                              actions=rule.actions,
-                             description=IntrospectionRule,
-                             scope=scope)
+                             description=description,
+                             scope=rule.scope)
 
 
 def get(uuid):
@@ -462,8 +462,8 @@ def apply(node_info, data):
     to_apply = []
     for rule in rules:
         # if rule.scope and rule.scope != node.properties['inspection_scope']:
-        #     # if rule.scope is set but does not match the node inspection scope
-        #     # then ignore
+        #     # if rule.scope is set but does not match the node
+        #     # inspection scope then ignore
         #     continue
 
         if rule.check_conditions(node_info, data):
