@@ -40,6 +40,8 @@ class BaseTest(test_base.NodeTest):
             'local_gb': 42,
         }
 
+        self.scope = "inner circle"
+
     @staticmethod
     def condition_defaults(condition):
         condition = condition.copy()
@@ -160,6 +162,16 @@ class TestCreateRule(BaseTest):
                                rules.create,
                                self.conditions_json, self.actions_json)
 
+    def test_scope(self):
+        rule = rules.create([], self.actions_json, scope=self.scope)
+        rule_json = rule.as_dict()
+
+        self.assertTrue(rule_json.pop('uuid'))
+        self.assertEqual({'description': None,
+                          'conditions': [],
+                          'actions': self.actions_json,
+                          'scope': self.scope},
+                         rule_json)
 
 class TestGetRule(BaseTest):
     def setUp(self):
