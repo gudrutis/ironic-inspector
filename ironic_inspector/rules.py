@@ -214,6 +214,28 @@ class IntrospectionRule(object):
         LOG.debug('Successfully applied actions',
                   node_info=node_info, data=data)
 
+    def check_if_rule_applies(self, node_info):
+        """
+        Checks if rule is applicable to a node. As of now, check if node falls
+        under rule.scope and is applicable.
+
+        :param node_info: a NodeInfo object
+        :returns: True if conditions match, otherwise False
+        """
+        # Todo-zm possible to simplify?
+        node_scope = ''
+        if 'inspection_scope' in node_info.node().properties:
+            node_scope = node_info.node().properties['inspection_scope']
+
+        if not self._scope:
+            return True  # rule's scope is not set, rule is global
+        if self._scope != node_scope:
+            # rule's scope is set but does not match Node's scope or
+            # Node's scope is not set
+            return False
+        # scopes match
+        return True
+
 
 def _format_value(value, data):
     """Apply parameter formatting to a value.
@@ -461,12 +483,8 @@ def apply(node_info, data):
 
     to_apply = []
     for rule in rules:
-        # if rule.scope and rule.scope != node.properties['inspection_scope']:
-        #     # if rule.scope is set but does not match the node
-        #     # inspection scope then ignore
-        #     continue
-
-        if rule.check_conditions(node_info, data):
+        if (rule.check_if_rule_applies(node_info) and
+                rule.check_conditions(node_info, data)):
             to_apply.append(rule)
 
     if to_apply:
