@@ -173,6 +173,7 @@ class TestCreateRule(BaseTest):
                           'scope': self.scope},
                          rule_json)
 
+
 class TestGetRule(BaseTest):
     def setUp(self):
         super(TestGetRule, self).setUp()
@@ -574,3 +575,48 @@ class TestApply(BaseTest):
                     self.node_info, data=self.data)
             else:
                 self.assertFalse(rule.apply_actions.called)
+
+"""
+This test should test that rules are only applied on the nodes that fall
+in their scope.
+Check that:
+1 global rule is applied to all nodes
+2 different rules with scopes are applied to different nodes
+1 rule with scope is not applied
+"""
+@mock.patch.object(rules, 'get_all', autospec=True)
+class TestRuleScope(BaseTest):
+    def setUp(self):
+        super(TestRuleScope, self).setUp()
+
+        """
+        rule_global
+        rule_scope_1
+        rule_scope_2
+        rule_out_scope
+        """
+
+        self.rules = [rules.IntrospectionRule("", "", "", "", None),
+                      rules.IntrospectionRule("", "", "", "", "scope_1"),
+                      rules.IntrospectionRule("", "", "", "", "scope_2"),
+                      rules.IntrospectionRule("", "", "", "", "scope_3")]
+        for r in self.rules:
+            r.check_conditions = mock.Mock()
+            r.check_conditions.return_value = True
+            r.apply_actions = mock.Mock()
+            r.apply_actions.return_value = True
+
+    def test_node_no_scope(self, mock_get_all):
+        mock_get_all = self.rules
+        # self.node_info.node().properties['inspection_scope'] = '' pass
+        # todo only globall call rgistered
+
+    def test_node_scope_1(self, mock_get_all):
+        self.node_info.node().properties['inspection_scope'] = 'scope_1'
+        print(self.node_info.node().properties)
+          # 2 calls
+
+    def test_node_scope_2(self, mock_get_all):
+        mock_get_all = self.rules
+        self.node_info.node().properties['inspection_scope'] = 'scope_2'
+          # 2 calls
