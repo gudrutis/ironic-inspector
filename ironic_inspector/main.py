@@ -417,7 +417,8 @@ def api_rules():
         rule = rules.create(conditions_json=body.get('conditions', []),
                             actions_json=body.get('actions', []),
                             uuid=body.get('uuid'),
-                            description=body.get('description'))
+                            description=body.get('description'),
+                            scope=body.get('scope'))
 
         response_code = (200 if _get_version() < (1, 6) else 201)
         return flask.make_response(
