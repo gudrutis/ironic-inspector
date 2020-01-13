@@ -361,7 +361,7 @@ def _validate_actions(actions_json):
         actions.append((action_json['action'], params))
     return actions
 
-# TODO update call
+
 def create(conditions_json, actions_json, uuid=None,
            description=None, scope=None):
     """Create a new rule in database.

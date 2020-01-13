@@ -1,0 +1,6 @@
+---
+features:
+  - Previously, all imported introspection rules were applied when inspecting
+    any type of node. There was no mechanism to apply only a selected set of
+    rules. This change fixes it by introducing scopes to nodes and rules.
+
