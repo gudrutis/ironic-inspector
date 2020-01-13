@@ -607,16 +607,29 @@ class TestRuleScope(BaseTest):
             r.apply_actions.return_value = True
 
     def test_node_no_scope(self, mock_get_all):
-        mock_get_all = self.rules
-        # self.node_info.node().properties['inspection_scope'] = '' pass
-        # todo only globall call rgistered
+        mock_get_all.return_value = self.rules
+        self.node_info.node().properties['inspection_scope'] = None
+        rules.apply(self.node_info, self.data)
+        self.rules[0].apply_actions.assert_called_once()  # global
+        self.rules[1].apply_actions.assert_not_called()   # scope_1
+        self.rules[2].apply_actions.assert_not_called()   # scope_2
+        self.rules[3].apply_actions.assert_not_called()   # scope_3
 
     def test_node_scope_1(self, mock_get_all):
-        self.node_info.node().properties['inspection_scope'] = 'scope_1'
-        print(self.node_info.node().properties)
-          # 2 calls
+        mock_get_all.return_value = self.rules
+        self.node_info.node().properties['inspection_scope'] = "scope_1"
+        rules.apply(self.node_info, self.data)
+        self.rules[0].apply_actions.assert_called_once()  # global
+        self.rules[1].apply_actions.assert_called_once()   # scope_1
+        self.rules[2].apply_actions.assert_not_called()   # scope_2
+        self.rules[3].apply_actions.assert_not_called()   # scope_3
+
 
     def test_node_scope_2(self, mock_get_all):
-        mock_get_all = self.rules
-        self.node_info.node().properties['inspection_scope'] = 'scope_2'
-          # 2 calls
+        mock_get_all.return_value = self.rules
+        self.node_info.node().properties['inspection_scope'] = "scope_2"
+        rules.apply(self.node_info, self.data)
+        self.rules[0].apply_actions.assert_called_once()  # global
+        self.rules[1].apply_actions.assert_not_called()   # scope_1
+        self.rules[2].apply_actions.assert_called_once()   # scope_2
+        self.rules[3].apply_actions.assert_not_called()   # scope_3
