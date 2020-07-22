@@ -491,7 +491,9 @@ class TestApiRules(BaseAPITest):
     def test_create(self, create_mock):
         data = {'uuid': self.uuid,
                 'conditions': 'cond',
-                'actions': 'act'}
+                'actions': 'act',
+                'conditions_join_type': 'xor',
+                'invert_conditions_outcome': True}
         exp = data.copy()
         exp['description'] = None
         create_mock.return_value = mock.Mock(spec=rules.IntrospectionRule,
@@ -499,20 +501,26 @@ class TestApiRules(BaseAPITest):
 
         res = self.app.post('/v1/rules', data=json.dumps(data))
         self.assertEqual(201, res.status_code)
+        # check if ironic_inspector.rules.create is called with these
+        # values
         create_mock.assert_called_once_with(conditions_json='cond',
                                             actions_json='act',
                                             uuid=self.uuid,
                                             description=None,
-                                            scope=None)
+                                            scope=None,
+                                            conditions_join_type='xor',
+                                            invert_conditions_outcome=True
+                                            )
         self.assertEqual(exp, json.loads(res.data.decode('utf-8')))
 
     @mock.patch.object(rules, 'create', autospec=True)
     def test_create_api_less_1_6(self, create_mock):
         data = {'uuid': self.uuid,
                 'conditions': 'cond',
-                'actions': 'act'}
+                'actions': 'act',
+                'conditions_join_type': 'xor',
+                'invert_conditions_outcome': True}
         exp = data.copy()
-        exp['description'] = None
         create_mock.return_value = mock.Mock(spec=rules.IntrospectionRule,
                                              **{'as_dict.return_value': exp})
 
@@ -526,7 +534,11 @@ class TestApiRules(BaseAPITest):
                                             actions_json='act',
                                             uuid=self.uuid,
                                             description=None,
-                                            scope=None)
+                                            scope=None,
+                                            conditions_join_type='xor',
+                                            invert_conditions_outcome=True
+                                            )
+
         self.assertEqual(exp, json.loads(res.data.decode('utf-8')))
 
     @mock.patch.object(rules, 'create', autospec=True)

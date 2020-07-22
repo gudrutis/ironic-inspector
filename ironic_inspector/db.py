@@ -28,7 +28,7 @@ from sqlalchemy import (Boolean, Column, DateTime, Enum, ForeignKey,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import orm
 
-
+from ironic_inspector.enums import RuleConditionJoinEnum as JoinEnum
 from ironic_inspector import introspection_state as istate
 
 
@@ -92,7 +92,10 @@ class Rule(Base):
     # NOTE(dtantsur): in the future we might need to temporary disable a rule
     disabled = Column(Boolean, default=False)
     scope = Column(String(255), nullable=True)
-
+    conditions_join_type = Column(Enum(*JoinEnum.all()), nullable=False,
+                                  default=JoinEnum.AND,
+                                  server_default=JoinEnum.AND)
+    invert_conditions_outcome = Column(Boolean, default=False)
     conditions = orm.relationship('RuleCondition', lazy='joined',
                                   order_by='RuleCondition.id',
                                   cascade="all, delete-orphan")

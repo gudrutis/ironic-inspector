@@ -23,5 +23,7 @@
          "field":"node://driver_info.deploy_kernel"
       }
    ],
-   "scope":"Delivery_1"
+   "scope":"Delivery_1",
+   "conditions_join_type":"and",
+   "invert_conditions_outcome":"False"
 }

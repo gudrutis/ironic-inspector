@@ -103,6 +103,24 @@ results (e.g. the field contains a list), available options are:
 All other fields are passed to the condition plugin, e.g. numeric comparison
 operations require a ``value`` field to compare against.
 
+Conditions join type
+^^^^^^^^^^^^^^^^^^^^
+
+``conditions_join_type`` is a variable set on introspection rule. It tells if
+all, any or strictly not all conditions needs to pass in order for rule to be
+applied. It can be set to logical operands such as:
+
+* ``and`` (the default) only if all conditions are true apply the rule,
+* ``or`` if all or any of the conditions are true apply the rule,
+* ``xor`` if some but not all conditions are true apply the rule.
+
+Invert conditions outcome
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When set to ``true``, ``invert_conditions_outcome`` negates the outcome of
+conditions after they have been evaluated and connected using
+``conditions_join_type``. By default, it is set to ``false``.
+
 Scope
 ^^^^^
 

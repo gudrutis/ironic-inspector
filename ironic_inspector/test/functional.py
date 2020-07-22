@@ -432,7 +432,9 @@ class Test(Base):
             ],
             'actions': [{'action': 'fail', 'message': 'boom'}],
             'description': 'Cool actions',
-            'scope': "sniper's scope"
+            'scope': "sniper's scope",
+            "conditions_join_type": "or",
+            "invert_conditions_outcome": True
         }
 
         res = self.call_add_rule(rule)
@@ -449,10 +451,13 @@ class Test(Base):
 
         res = self.call_list_rules()
         self.assertEqual(rule['links'], res[0].pop('links'))
-        self.assertEqual([{'uuid': rule['uuid'],
-                           'description': rule['description'],
-                           'scope': rule['scope']}],
-                         res)
+        self.assertEqual(
+            [{'uuid': rule['uuid'],
+              'description': rule['description'],
+              'scope': rule['scope'],
+              'conditions_join_type': rule['conditions_join_type'],
+              'invert_conditions_outcome': rule['invert_conditions_outcome']}
+             ], res)
 
         res = self.call_get_rule(rule['uuid'])
         self.assertEqual(rule, res)

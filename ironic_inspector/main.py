@@ -12,6 +12,7 @@
 # limitations under the License.
 
 import functools
+import json
 import os
 import random
 import re
@@ -29,6 +30,7 @@ from ironic_inspector.common import rpc
 from ironic_inspector.conductor import manager
 import ironic_inspector.conf
 from ironic_inspector.conf import opts as conf_opts
+from ironic_inspector.enums import RuleConditionJoinEnum as JoinEnum
 from ironic_inspector import node_cache
 from ironic_inspector import process
 from ironic_inspector import rules
@@ -43,7 +45,7 @@ _wsgi_app = _app.wsgi_app
 LOG = utils.getProcessingLogger(__name__)
 
 MINIMUM_API_VERSION = (1, 0)
-CURRENT_API_VERSION = (1, 16)
+CURRENT_API_VERSION = (1, 17)
 DEFAULT_API_VERSION = CURRENT_API_VERSION
 _LOGGING_EXCLUDED_KEYS = ('logs',)
 
@@ -430,13 +432,31 @@ def api_rules():
             raise utils.Error(
                 _("Invalid scope: the length of the scope should be within "
                   "255 characters"), code=400)
+        join_type = body.get('conditions_join_type')
+        if join_type and join_type not in JoinEnum.all():
+            raise utils.Error(
+                _("Invalid type: 'conditions_join_type' needs to be "
+                  "in %s" % JoinEnum.all()), code=400)
 
-        rule = rules.create(conditions_json=body.get('conditions', []),
-                            actions_json=body.get('actions', []),
-                            uuid=body.get('uuid'),
-                            description=body.get('description'),
-                            scope=body.get('scope'))
+        invert_outcome = body.get('invert_conditions_outcome')
+        if invert_outcome and str(invert_outcome).lower() not in \
+                ('true', 'false'):
+            raise utils.Error(
+                _("Invalid type: 'invert_conditions_outcome' needs to be"
+                  "boolean 'true' or 'false'"), code=400)
+        elif invert_outcome and str(invert_outcome).lower() in \
+                ('true', 'false'):
+            invert_outcome = json.loads(str(invert_outcome).lower())
 
+        rule = rules.create(
+            conditions_json=body.get('conditions', []),
+            actions_json=body.get('actions', []),
+            uuid=body.get('uuid'),
+            description=body.get('description'),
+            scope=body.get('scope'),
+            conditions_join_type=join_type,
+            invert_conditions_outcome=invert_outcome
+        )
         response_code = (200 if _get_version() < (1, 6) else 201)
         return flask.make_response(
             flask.jsonify(rule_repr(rule, short=False)), response_code)

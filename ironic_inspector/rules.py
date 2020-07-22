@@ -23,9 +23,9 @@ from sqlalchemy import orm
 
 from ironic_inspector.common.i18n import _
 from ironic_inspector import db
+from ironic_inspector.enums import RuleConditionJoinEnum as JoinEnum
 from ironic_inspector.plugins import base as plugins_base
 from ironic_inspector import utils
-
 
 LOG = utils.getProcessingLogger(__name__)
 _CONDITIONS_SCHEMA = None
@@ -101,19 +101,25 @@ def actions_schema():
 class IntrospectionRule(object):
     """High-level class representing an introspection rule."""
 
-    def __init__(self, uuid, conditions, actions, description, scope=None):
+    def __init__(self, uuid, conditions, actions, description, scope=None,
+                 conditions_join_type=JoinEnum.AND,
+                 invert_conditions_outcome=False):
         """Create rule object from database data."""
         self._uuid = uuid
         self._conditions = conditions
         self._actions = actions
         self._description = description
         self._scope = scope
+        self._conditions_join_type = conditions_join_type
+        self._invert_conditions_outcome = invert_conditions_outcome
 
     def as_dict(self, short=False):
         result = {
             'uuid': self._uuid,
             'description': self._description,
-            'scope': self._scope
+            'scope': self._scope,
+            'conditions_join_type': self._conditions_join_type,
+            'invert_conditions_outcome': self._invert_conditions_outcome
         }
 
         if not short:
@@ -136,6 +142,8 @@ class IntrospectionRule(object):
         LOG.debug('Checking rule "%s"', self.description,
                   node_info=node_info, data=data)
         ext_mgr = plugins_base.rule_conditions_manager()
+        n_of_cond_false = 0
+        n_of_cond_true = 0
         for cond in self._conditions:
             scheme, path = _parse_path(cond.field)
 
@@ -159,7 +167,8 @@ class IntrospectionRule(object):
                              'be applied',
                              {'path': cond.field, 'rule': self.description},
                              node_info=node_info, data=data)
-                    return False
+                    n_of_cond_false += 1
+                    continue
 
             for value in field_values:
                 result = cond_ext.check(node_info, value, cond.params)
@@ -172,16 +181,56 @@ class IntrospectionRule(object):
                     break
 
             if not result:
-                LOG.info('Rule "%(rule)s" will not be applied: condition '
-                         '%(field)s %(op)s %(params)s failed',
-                         {'rule': self.description, 'field': cond.field,
-                          'op': cond.op, 'params': cond.params},
-                         node_info=node_info, data=data)
-                return False
+                n_of_cond_false += 1
+                LOG.debug('Condition for Rule "%(rule)s" failed:  '
+                          '%(field)s %(op)s %(params)s. Continuing.',
+                          {'rule': self.description, 'field': cond.field,
+                           'op': cond.op, 'params': cond.params},
+                          node_info=node_info, data=data)
+                continue
+            n_of_cond_true += 1
+            LOG.debug('Condition for Rule "%(rule)s" succeeded:  '
+                      '%(field)s %(op)s %(params)s. Continuing.',
+                      {'rule': self.description, 'field': cond.field,
+                       'op': cond.op, 'params': cond.params},
+                      node_info=node_info, data=data)
+        check_conditions_dict = {
+            # t - n_of_cond_true (number of conditions that evaluate true)
+            # f - n_of_cond_false (number of conditions that evaluate false)
+            JoinEnum.AND: lambda t, f: True if t and not f else False,
+            JoinEnum.OR: lambda t, f: True if t else False,
+            JoinEnum.XOR: lambda t, f: True if t and f else f
+        }
 
-        LOG.info('Rule "%s" will be applied', self.description,
-                 node_info=node_info, data=data)
-        return True
+        if self._conditions_join_type not in check_conditions_dict:
+            LOG.info(
+                'Unknown condition join type - %s, ignoring rule "%s"',
+                self._conditions_join_type, self.description,
+                node_info=node_info, data=data
+            )
+            return False
+
+        outcome = (check_conditions_dict
+                   [self._conditions_join_type](n_of_cond_true,
+                                                n_of_cond_false))
+        if self._invert_conditions_outcome:
+            outcome = not outcome
+
+        if outcome:
+            LOG.info('Rule "%s" will be applied', self.description,
+                     node_info=node_info, data=data)
+        else:
+            LOG.info('Conditions are not met for rule "%(rule)s", rule will be'
+                     'omitted. Conditions matched: %(con_t)s. Not '
+                     'matched: %(con_f)s. Condition join type: "%(join)s". '
+                     'Was the outcome inverted : %(invert_outcome)s',
+                     {'rule': self.description,
+                      'con_t': n_of_cond_true,
+                      'con_f': n_of_cond_false,
+                      'join': self._conditions_join_type,
+                      'invert_outcome': self._invert_conditions_outcome},
+                     node_info=node_info, data=data)
+        return outcome
 
     def apply_actions(self, node_info, data=None):
         """Run actions on a node.
@@ -220,9 +269,18 @@ class IntrospectionRule(object):
         :returns: True if conditions match, otherwise False
         """
         if not self._scope:
+            LOG.debug('Rule "%s" is global and will be applied if conditions '
+                      'are met.', self._description)
             return True
-        return self._scope == \
-            node_info.node().properties.get('inspection_scope')
+        if self._scope == node_info.node().properties.get('inspection_scope'):
+            LOG.debug('Rule "%s" and node have a matching scope "%s and will '
+                      'be applied if conditions are met.', self._description,
+                      self._scope)
+            return True
+        else:
+            LOG.debug('Rule\'s "%s" scope "%s" does not match node\'s scope. '
+                      'Rule will be ignored', self._description, self._scope)
+            return False
 
 
 def _format_value(value, data):
@@ -351,7 +409,8 @@ def _validate_actions(actions_json):
 
 
 def create(conditions_json, actions_json, uuid=None,
-           description=None, scope=None):
+           description=None, scope=None, conditions_join_type=None,
+           invert_conditions_outcome=None):
     """Create a new rule in database.
 
     :param conditions_json: list of dicts with the following keys:
@@ -365,23 +424,37 @@ def create(conditions_json, actions_json, uuid=None,
     :param description: human-readable rule description
     :param scope: if scope on node and rule matches, rule applies;
                   if its empty, rule applies to all nodes.
+    :param conditions_join_type: what boolean logic operator to use to
+                                 join outcomes of all conditions. Defaults to
+                                 'and'.
+    :param invert_conditions_outcome: should the outcome of joined conditions
+                                      to be negated (inverted) or not.
     :returns: new IntrospectionRule object
     :raises: utils.Error on failure
     """
     uuid = uuid or uuidutils.generate_uuid()
+    conditions_join_type = conditions_join_type or JoinEnum.AND
+    invert_conditions_outcome = (
+        invert_conditions_outcome
+        if invert_conditions_outcome is not None
+        else False
+    )
     LOG.debug('Creating rule %(uuid)s with description "%(descr)s", '
               'conditions %(conditions)s, scope "%(scope)s"'
               ' and actions %(actions)s',
               {'uuid': uuid, 'descr': description, 'scope': scope,
-               'conditions': conditions_json, 'actions': actions_json})
+               'conditions': conditions_json, 'actions': actions_json,
+               'conditions_join_type': conditions_join_type,
+               'invert_conditions_outcome': invert_conditions_outcome})
 
     conditions = _validate_conditions(conditions_json)
     actions = _validate_actions(actions_json)
-
     try:
         with db.ensure_transaction() as session:
             rule = db.Rule(uuid=uuid, description=description, disabled=False,
-                           created_at=timeutils.utcnow(), scope=scope)
+                           created_at=timeutils.utcnow(), scope=scope,
+                           conditions_join_type=conditions_join_type,
+                           invert_conditions_outcome=invert_conditions_outcome)
 
             for field, op, multiple, invert, params in conditions:
                 rule.conditions.append(db.RuleCondition(op=op,
@@ -400,15 +473,23 @@ def create(conditions_json, actions_json, uuid=None,
                   'creating a rule', exc)
         raise utils.Error(_('Rule with UUID %s already exists') % uuid,
                           code=409)
+    except db_exc.DBError as exc:
+        LOG.error('Database integrity error %s when creating a rule', exc)
+        raise utils.Error(_('Database integrity error %s when creating '
+                            'a rule') % exc)
 
     LOG.info('Created rule %(uuid)s with description "%(descr)s" '
              'and scope "%(scope)s"',
              {'uuid': uuid, 'descr': description, 'scope': scope})
-    return IntrospectionRule(uuid=uuid,
-                             conditions=rule.conditions,
-                             actions=rule.actions,
-                             description=description,
-                             scope=rule.scope)
+    return IntrospectionRule(
+        uuid=uuid,
+        conditions=rule.conditions,
+        actions=rule.actions,
+        description=description,
+        scope=rule.scope,
+        conditions_join_type=rule.conditions_join_type,
+        invert_conditions_outcome=rule.invert_conditions_outcome
+    )
 
 
 def get(uuid):
@@ -418,20 +499,27 @@ def get(uuid):
     except orm.exc.NoResultFound:
         raise utils.Error(_('Rule %s was not found') % uuid, code=404)
 
-    return IntrospectionRule(uuid=rule.uuid, actions=rule.actions,
-                             conditions=rule.conditions,
-                             description=rule.description,
-                             scope=rule.scope)
+    return IntrospectionRule(
+        uuid=rule.uuid, actions=rule.actions,
+        conditions=rule.conditions,
+        description=rule.description,
+        scope=rule.scope,
+        conditions_join_type=rule.conditions_join_type,
+        invert_conditions_outcome=rule.invert_conditions_outcome
+    )
 
 
 def get_all():
     """List all rules."""
     query = db.model_query(db.Rule).order_by(db.Rule.created_at)
-    return [IntrospectionRule(uuid=rule.uuid, actions=rule.actions,
-                              conditions=rule.conditions,
-                              description=rule.description,
-                              scope=rule.scope)
-            for rule in query]
+    return [IntrospectionRule(
+                uuid=rule.uuid, actions=rule.actions,
+                conditions=rule.conditions,
+                description=rule.description,
+                scope=rule.scope,
+                conditions_join_type=rule.conditions_join_type,
+                invert_conditions_outcome=rule.invert_conditions_outcome
+            ) for rule in query]
 
 
 def delete(uuid):

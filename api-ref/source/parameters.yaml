@@ -101,6 +101,13 @@ conditions:
   in: body
   required: false
   type: array
+conditions_join_type:
+  description: |
+    Boolean algebra operator. Set on introspection rule and used to determine
+    how to connect rule's conditions.
+  in: body
+  required: false
+  type: string
 cpu:
   description: |
     CPU information containing at least keys ``count`` (CPU count) and
@@ -165,6 +172,12 @@ inventory:
   in: body
   required: true
   type: object
+invert_conditions_outcome:
+  description: |
+    If set to true, will invert the outcome of rule's conditions check.
+  in: body
+  required: false
+  type: bolean
 links:
   description: |
     A list of relative links. Includes the self and

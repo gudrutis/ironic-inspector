@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    Makes definition of introspection rules more flexible by allowing to choose
+    logical operator to connect multiple conditions. It also alows to negate
+    outcome of all conditions checks.

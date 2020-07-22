@@ -34,6 +34,8 @@ Request
     - actions: actions
     - description: description
     - scope: scope
+    - conditions_join_type: conditions_join_type
+    - invert_conditions_outcome: invert_conditions_outcome
 
 
 **Example creating rule request:**
@@ -56,6 +58,8 @@ section may contain additional default fields, like ``invert``,
     - actions: actions
     - description: description
     - scope: scope
+    - conditions_join_type: conditions_join_type
+    - invert_conditions_outcome: invert_conditions_outcome
 
 **Example JSON representation:**
 
@@ -80,6 +84,8 @@ Response
     - uuid: uuid
     - description: description
     - scope: scope
+    - conditions_join_type: conditions_join_type
+    - invert_conditions_outcome: invert_conditions_outcome
     - links: links
 
 **Example JSON representation:**
@@ -121,6 +127,8 @@ The response will contain full rule object:
     - actions: actions
     - description: description
     - scope: scope
+    - conditions_join_type: conditions_join_type
+    - invert_conditions_outcome: invert_conditions_outcome
 
 **Example JSON representation:**
 

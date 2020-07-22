@@ -18,6 +18,7 @@ from unittest import mock
 from oslo_utils import uuidutils
 
 from ironic_inspector import db
+from ironic_inspector.enums import RuleConditionJoinEnum as JoinEnum
 from ironic_inspector.plugins import base as plugins_base
 from ironic_inspector import rules
 from ironic_inspector.test import base as test_base
@@ -40,8 +41,9 @@ class BaseTest(test_base.NodeTest):
             'memory_mb': 1024,
             'local_gb': 42,
         }
-
         self.scope = "inner circle"
+        self.conditions_join_type = JoinEnum.XOR
+        self.invert_conditions_outcome = True
 
     @staticmethod
     def condition_defaults(condition):
@@ -60,7 +62,9 @@ class TestCreateRule(BaseTest):
         self.assertEqual({'description': None,
                           'conditions': [],
                           'actions': self.actions_json,
-                          'scope': None},
+                          'scope': None,
+                          'conditions_join_type': JoinEnum.AND,
+                          'invert_conditions_outcome': False},
                          rule_json)
 
     def test_create_action_none_value(self):
@@ -73,7 +77,9 @@ class TestCreateRule(BaseTest):
         self.assertEqual({'description': None,
                           'conditions': [],
                           'actions': self.actions_json,
-                          'scope': None},
+                          'scope': None,
+                          'conditions_join_type': JoinEnum.AND,
+                          'invert_conditions_outcome': False},
                          rule_json)
 
     def test_duplicate_uuid(self):
@@ -100,7 +106,9 @@ class TestCreateRule(BaseTest):
                           'conditions': [BaseTest.condition_defaults(cond)
                                          for cond in self.conditions_json],
                           'actions': self.actions_json,
-                          'scope': None},
+                          'scope': None,
+                          'conditions_join_type': JoinEnum.AND,
+                          'invert_conditions_outcome': False},
                          rule_json)
 
     def test_invalid_condition(self):
@@ -171,8 +179,56 @@ class TestCreateRule(BaseTest):
         self.assertEqual({'description': None,
                           'conditions': [],
                           'actions': self.actions_json,
-                          'scope': self.scope},
+                          'scope': self.scope,
+                          'conditions_join_type': JoinEnum.AND,
+                          'invert_conditions_outcome': False},
                          rule_json)
+
+    def test_no_condition_join(self):
+        rule = rules.create([], self.actions_json)
+        rule_json = rule.as_dict()
+        self.assertTrue(rule_json.pop('uuid'))
+        # Check if it used default value 'and'
+        self.assertEqual({'description': None,
+                          'conditions': [],
+                          'actions': self.actions_json,
+                          'scope': None,
+                          'conditions_join_type': JoinEnum.AND,
+                          'invert_conditions_outcome': False},
+                         rule_json)
+
+    def test_condition_join(self):
+        rule = rules.create([], self.actions_json,
+                            conditions_join_type=self.conditions_join_type)
+        rule_json = rule.as_dict()
+        self.assertTrue(rule_json.pop('uuid'))
+        self.assertEqual({'description': None,
+                          'conditions': [],
+                          'scope': None,
+                          'actions': self.actions_json,
+                          'conditions_join_type': self.conditions_join_type,
+                          'invert_conditions_outcome': False},
+                         rule_json)
+
+    def test_non_allowed_condition_join(self):
+        self.assertRaises(
+            utils.Error, rules.create,
+            self.conditions_json, self.actions_json,
+            conditions_join_type="Not in enum"
+        )
+
+    def test_no_condition_invert(self):
+        pass
+
+    def test_condition_invert(self):
+        pass
+
+    def test_non_allowed_condition_invert(self):
+        self.assertRaises(
+            utils.Error, rules.create,
+            self.conditions_json, self.actions_json,
+            invert_conditions_outcome="Not boolean"
+        )
 
 
 class TestGetRule(BaseTest):
@@ -188,7 +244,10 @@ class TestGetRule(BaseTest):
                           'conditions': [BaseTest.condition_defaults(cond)
                                          for cond in self.conditions_json],
                           'actions': self.actions_json,
-                          'scope': None},
+                          'scope': None,
+                          'conditions_join_type': 'and',
+                          'invert_conditions_outcome': False,
+                          },
                          rule_json)
 
     def test_not_found(self):
@@ -302,9 +361,12 @@ class TestCheckConditions(BaseTest):
         self.cond_mock.check.return_value = False
 
         res = self.rule.check_conditions(self.node_info, self.data)
-
-        self.cond_mock.check.assert_called_once_with(self.node_info, 1024,
-                                                     {'value': 1024})
+        self.cond_mock.check.assert_any_call(self.node_info, 1024,
+                                             {'value': 1024})
+        self.cond_mock.check.assert_any_call(self.node_info, 42,
+                                             {'value': 60})
+        self.assertEqual(len(self.conditions_json),
+                         self.cond_mock.check.call_count)
         self.assertFalse(res)
 
 

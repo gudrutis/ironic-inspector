@@ -403,3 +403,5 @@ Version History
   in the actions of introspection rules.
 * **1.15** allows reapply with provided introspection data from request.
 * **1.16** adds ``scope`` field to introspection rule.
+* **1.17** adds ``conditions_join_type`` and ``invert_conditions_outcome``
+  fields to introspection rule.
